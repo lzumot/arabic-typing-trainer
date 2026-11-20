@@ -1,0 +1,7 @@
+# local history and runtime
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+.DS_Store

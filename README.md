@@ -19,6 +19,17 @@ characters.
 
 **Anywhere** — `python trainer.py` starts the server if it is not running and opens the app.
 
+### Install Python on Windows (once)
+
+1. Open https://www.python.org/downloads/windows/ and download the latest **Windows installer (64-bit)**.
+2. Run it, tick **Add python.exe to PATH** at the bottom of the first screen, then **Install Now**.
+3. Close any open Command Prompt, open a new one (`Win+R`, type `cmd`), and check:
+   `python --version` should print `Python 3.12.x` or newer. If the Microsoft Store opens
+   instead, run `py -3 --version` — the launcher is fine and `Start Trainer.bat` tries it first.
+4. Double-click `Start Trainer.bat`.
+
+Nothing else to install: `server.py` uses only the standard library, and SQLite ships with Python.
+
 The first keypress is already play. Blocks fall; type the letter or the short word on screen.
 Each game shows its own instruction card the first time you open it, and the `?` in the
 top-left corner brings it back.

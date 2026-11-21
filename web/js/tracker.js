@@ -58,7 +58,10 @@ export class Tracker {
   }
 
   resolveItem(correct) {
-    if (correct) this.correctItems += 1;
+    if (correct) {
+      this.correctItems += 1;
+      if (this.app.score) this.app.score.word();
+    }
   }
 
   log({ expected, key, code, shift, correct, appeared }) {
@@ -75,6 +78,7 @@ export class Tracker {
       error_class: correct ? '' : (classifyError(expected, key, code, shift) || 'location'),
     };
     this.rows.push(row);
+    if (this.app.score) this.app.score.keystroke(correct);
     return row;
   }
 

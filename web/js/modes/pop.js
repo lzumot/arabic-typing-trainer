@@ -1,5 +1,3 @@
-import { POP_ALPHABET } from '../textbank.js';
-
 const ROUND_MS = 30000;
 const MIN_SPEED = 60;
 
@@ -43,14 +41,23 @@ export class PopMode {
 
   spawn() {
     if (this.done) return;
-    this.target = this.app.pickLetter(POP_ALPHABET);
+    this.target = this.app.pickPopUnit();
+    this.i = 0;
     this.appeared = this.tracker.present();
     this.y = 0;
-    this.glyphEl.textContent = this.target;
+    this.renderTarget();
     this.glyphEl.classList.remove('popped', 'drifted', 'shake');
+    this.letterEl.classList.toggle('word', this.target.length > 1);
     this.letterEl.style.transform = 'translate(-50%, 0px)';
     this.letterEl.style.opacity = '1';
     this.letterEl.style.fontSize = '';
+  }
+
+  renderTarget() {
+    const typed = this.target.slice(0, this.i);
+    const rest = this.target.slice(this.i);
+    this.glyphEl.innerHTML = (typed ? '<span class="typed">' + typed + '</span>' : '')
+      + '<span class="rest">' + rest + '</span>';
   }
 
   frame(now) {
@@ -81,19 +88,31 @@ export class PopMode {
     }, 420);
   }
 
+  scoreLabel() {
+    return 'Pop · ' + this.app.popStageName();
+  }
+
   onKey(ev) {
     if (this.done || !this.target) return;
     if (ev.key.length !== 1) return;
-    const correct = ev.key === this.target;
+    const expected = this.target[this.i];
+    const correct = ev.key === expected;
     this.tracker.log({
-      expected: this.target,
+      expected,
       key: ev.key,
       code: ev.code,
       shift: ev.shiftKey,
       correct,
-      appeared: this.appeared,
+      appeared: this.i === 0 ? this.appeared : null,
     });
     this.lastKeyAt = performance.now();
+
+    if (correct && this.i < this.target.length - 1) {
+      this.i += 1;
+      this.renderTarget();
+      this.app.audio.play('soft');
+      return;
+    }
 
     if (correct) {
       this.tracker.resolveItem(true);

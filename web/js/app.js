@@ -1,9 +1,10 @@
 import { Storage, uid } from './storage.js';
 import { Audio } from './audio.js';
 import { Tracker } from './tracker.js';
+import { ScoreBoard } from './score.js';
 import { letterMedians, adaptationScore, weightedPick } from './metrics.js';
 import { isArabicChar, isLatinChar } from './keymap.js';
-import { PASSAGES } from './textbank.js';
+import { PASSAGES, POP_ALPHABET, POP_WORDS } from './textbank.js';
 import { PopMode } from './modes/pop.js';
 import { TwinsMode } from './modes/twins.js';
 import { GhostMode } from './modes/ghost.js';
@@ -40,10 +41,83 @@ const MODES = {
   writer: WriterMode,
 };
 
+const MODE_HELP = {
+  pop: {
+    title: 'Pop',
+    goal: 'Type each falling block before it reaches the bottom.',
+    steps: [
+      'Blocks climb: one letter, then 2-letter, 3-letter and 4-letter words.',
+      'Type the letters in order, right to left. Typed letters dim.',
+      'A miss shakes the block and slows it down. 30 seconds per round.',
+    ],
+    keys: 'Any Arabic letter - Esc to stop',
+  },
+  twins: {
+    title: 'Twins',
+    goal: 'Fill the gap in the word with the right letter.',
+    steps: [
+      'A word appears with one letter missing.',
+      'The chips below are look-alike letters, for example ة and ه, or أ and إ.',
+      'A wrong letter shows the answer and moves on. 10 words per round.',
+    ],
+    keys: 'One Arabic letter per word - Esc to stop',
+  },
+  ghost: {
+    title: 'Ghost race',
+    goal: 'Race the ghost of your own best speed on the same text.',
+    steps: [
+      'Pick a built-in text or paste one of your own.',
+      'Type it exactly; the you bar moves against the ghost bar.',
+      '60 seconds per try. Your fastest run becomes the new ghost.',
+    ],
+    keys: 'Type the text - Esc to stop',
+  },
+  duel: {
+    title: 'Duel',
+    goal: 'Two runs on one text: you first, then the tutor.',
+    steps: [
+      'Type the text in your run.',
+      'Hand the keyboard over and press Start for the tutor run.',
+      'The faster run with 90% accuracy or better wins.',
+    ],
+    keys: 'Type the text - Esc to stop',
+  },
+  boss: {
+    title: 'Boss text',
+    goal: 'Get through the homework answer in one piece.',
+    steps: [
+      'Paste the homework question or answer, or pick an old one.',
+      'The text is split into chunks of 5 to 8 words.',
+      'A chunk only advances when the letters are right. Pips show progress.',
+    ],
+    keys: 'Type the chunk - Esc to stop',
+  },
+  writer: {
+    title: 'Writer',
+    goal: 'Free writing. Nothing here can be wrong.',
+    steps: [
+      'Type whatever you like, in Arabic.',
+      'Word count and WPM update as you go.',
+      'Text over 20 characters is saved as one of your own texts.',
+    ],
+    keys: 'Any key - Esc to finish',
+  },
+};
+
+function shuffle(list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 class App {
   constructor() {
     this.storage = new Storage();
     this.audio = new Audio();
+    this.score = new ScoreBoard(this);
     this.stage = document.getElementById('stage');
     this.trayEl = document.getElementById('tray');
     this.overlayEl = document.getElementById('overlay');
@@ -66,6 +140,11 @@ class App {
     this.lastRoundId = null;
     this.trayShown = false;
     this.trayTimer = null;
+    this.helpSeen = new Set();
+    this.modeId = 'pop';
+    this.popDeck = [];
+    this.popCount = 0;
+    this.popDeckStage = null;
   }
 
   async boot() {
@@ -87,6 +166,7 @@ class App {
     this.bests = new Map(this.data.bests.map((row) => [row.key, row]));
     this.letterHistory = letterMedians(this.data.keystrokes || []);
     this.clockVisible = this.readMeta('clock', 'on') === 'on';
+    this.score.load();
 
     this.session = {
       id: uid('session'),
@@ -103,10 +183,17 @@ class App {
     this.startMode('pop');
     this.tickClock();
     setInterval(() => this.tickClock(), 1000);
-    setInterval(() => this.touchSession(), 15000);
+    setInterval(() => { this.touchSession(); this.score.flush(); }, 15000);
     window.addEventListener('beforeunload', () => this.flushSession());
     document.addEventListener('keydown', (ev) => this.onKeydown(ev), true);
     document.addEventListener('pointerdown', () => this.audio.ready(), { once: true });
+    const helpBtn = document.getElementById('help-btn');
+    if (helpBtn) {
+      helpBtn.addEventListener('click', () => {
+        this.audio.play('soft');
+        this.openHelpFor(this.modeId);
+      });
+    }
   }
 
   readMeta(key, fallback) {
@@ -158,6 +245,8 @@ class App {
     const ss = String(seconds % 60).padStart(2, '0');
     this.clockEl.textContent = mm + ':' + ss;
     this.clockEl.hidden = !this.clockVisible;
+    this.score.checkDay();
+    this.score.render();
   }
 
   setClockVisible(on) {
@@ -190,6 +279,10 @@ class App {
   async beginRound(mode, textId) {
     const tracker = new Tracker(this, mode, textId);
     await tracker.begin();
+    this.score.startRound(mode);
+    if (this.mode && typeof this.mode.scoreLabel === 'function') {
+      this.score.setLabel(this.mode.scoreLabel());
+    }
     if (this.lastRoundId && this.lastRoundMode !== 'duel-tutor' && mode !== 'duel-tutor'
         && Date.now() - this.lastRoundEnd < 300000) {
       this.storage.update('rounds', this.lastRoundId, { continued: 1 });
@@ -207,6 +300,7 @@ class App {
     this.lastRoundEnd = Date.now();
     this.lastRoundId = tracker.id;
     this.lastRoundMode = tracker.mode;
+    this.score.endRound();
     if (summary) {
       this.data.rounds.push({
         id: tracker.id,
@@ -267,7 +361,7 @@ class App {
       const button = document.createElement('button');
       button.className = 'tray-btn';
       button.dataset.mode = meta.id;
-      button.title = meta.label;
+      button.dataset.label = meta.label;
       button.setAttribute('aria-label', meta.label);
       button.innerHTML = ICONS[meta.id];
       button.addEventListener('click', () => {
@@ -279,7 +373,7 @@ class App {
     });
     const records = document.createElement('button');
     records.className = 'tray-btn subtle';
-    records.title = 'My records';
+    records.dataset.label = 'My records';
     records.setAttribute('aria-label', 'My records');
     records.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 3l2.5 6 6.5.5-5 4.2 1.6 6.3L12 16.8 6.4 20l1.6-6.3-5-4.2 6.5-.5z"/></svg>';
     records.addEventListener('click', () => this.openRecords());
@@ -293,10 +387,20 @@ class App {
     this.trayEl.classList.add('in');
   }
 
-  startMode(id) {
+  startMode(id, fromHelp) {
     const Mode = MODES[id];
     if (!Mode) return;
+    if (!fromHelp && !this.helpSeen.has(id)) {
+      this.helpSeen.add(id);
+      if (this.mode) {
+        this.mode.unmount();
+        this.mode = null;
+      }
+      this.showHelp(id, () => this.startMode(id, true));
+      return;
+    }
     if (this.mode) this.mode.unmount();
+    this.modeId = id;
     this.mode = new Mode(this);
     this.stage.innerHTML = '';
     this.stage.className = 'stage mode-' + id;
@@ -314,6 +418,100 @@ class App {
     this.revealTray();
   }
 
+  // ---------- help ----------
+
+  showHelp(id, after) {
+    const help = MODE_HELP[id] || MODE_HELP[this.modeId] || MODE_HELP.pop;
+    this.overlayEl.hidden = false;
+    this.overlayEl.className = 'overlay help-overlay in';
+    this.overlayEl.innerHTML = `
+      <div class="help-card">
+        <h2>${help.title}</h2>
+        <p class="help-goal">${help.goal}</p>
+        <ol class="help-steps">${help.steps.map((s) => '<li>' + s + '</li>').join('')}</ol>
+        <p class="help-keys">${help.keys}</p>
+        <button class="soft-btn" id="help-close">${after ? 'Start' : 'Got it'}</button>
+      </div>`;
+    const close = () => {
+      this.closeOverlay();
+      if (after) after();
+    };
+    this.overlayEl.querySelector('#help-close').addEventListener('click', close);
+    this.overlayOpen = {
+      onKey: (ev) => {
+        if (ev.key === 'Escape' || ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          close();
+          return true;
+        }
+        return false;
+      },
+    };
+  }
+
+  openHelpFor(modeId) {
+    this.showHelp(modeId || this.modeId);
+  }
+
+  // ---------- pop unit picker ----------
+  // The deck climbs: single letters, then 2-letter words, then 3, then 4, then
+  // a mixed deck forever. The stage is kept in the meta table, so the next
+  // session continues from the same rung.
+
+  popStage() {
+    const stage = parseInt(this.readMeta('pop:stage', '0'), 10);
+    return Number.isFinite(stage) ? Math.min(4, Math.max(0, stage)) : 0;
+  }
+
+  popStageName(stage) {
+    const names = ['letters', '2-letter words', '3-letter words', '4-letter words', 'mixed'];
+    return names[stage == null ? this.popStage() : stage];
+  }
+
+  popPool(stage) {
+    if (stage === 0) return shuffle(POP_ALPHABET).slice(0, 16);
+    if (stage === 4) return shuffle([...shuffle(POP_ALPHABET).slice(0, 6), ...POP_WORDS]);
+    const words = POP_WORDS.filter((word) => word.length === stage + 1);
+    return shuffle(words).slice(0, 16);
+  }
+
+  advancePopStage() {
+    const stage = this.popStage();
+    if (stage >= 4) return stage;
+    const next = stage + 1;
+    this.writeMeta('pop:stage', String(next));
+    this.toast('Pop: ' + this.popStageName(next), '');
+    return next;
+  }
+
+  pickPopUnit() {
+    this.popCount += 1;
+    if (!this.popDeck.length) {
+      if (this.popDeckStage != null && this.popDeckStage < 4) {
+        this.popDeckStage = this.advancePopStage();
+      } else {
+        this.popDeckStage = this.popStage();
+      }
+      this.popDeck = this.popPool(this.popDeckStage);
+      if (!this.popDeck.length) this.popDeck = shuffle(POP_ALPHABET);
+    }
+    if (this.popDeckStage === 0 && this.popCount % 3 === 0) {
+      const slow = Object.entries(this.letterHistory)
+        .filter(([, s]) => s.median)
+        .sort((a, b) => b[1].median - a[1].median)
+        .slice(0, 8)
+        .map(([ch]) => ch)
+        .filter((ch) => this.popDeck.includes(ch));
+      if (slow.length) {
+        const drill = slow[Math.floor(Math.random() * slow.length)];
+        // Take it out of the deck so the rung still progresses.
+        this.popDeck.splice(this.popDeck.indexOf(drill), 1);
+        return drill;
+      }
+    }
+    return this.popDeck.pop();
+  }
+
   // ---------- keys ----------
 
   onKeydown(ev) {
@@ -324,11 +522,10 @@ class App {
     }
     this.audio.ready();
     if (this.overlayOpen) {
-      if (ev.key === 'Escape') {
+      const handled = this.overlayOpen.onKey ? this.overlayOpen.onKey(ev) : false;
+      if (!handled && ev.key === 'Escape') {
         ev.preventDefault();
         this.closeOverlay();
-      } else if (this.overlayOpen.onKey) {
-        this.overlayOpen.onKey(ev);
       }
       return;
     }
@@ -343,9 +540,12 @@ class App {
     if (ev.metaKey || ev.ctrlKey) return;
     if (!this.mode) {
       if (ev.key.length === 1) {
-        this.startMode('pop').then(() => {
-          if (this.mode && this.mode.onKey) this.mode.onKey(ev);
-        });
+        const started = this.startMode('pop');
+        if (started && started.then) {
+          started.then(() => {
+            if (this.mode && this.mode.onKey) this.mode.onKey(ev);
+          });
+        }
       }
       return;
     }

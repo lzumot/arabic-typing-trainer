@@ -60,6 +60,9 @@ export class TextRunner {
         span.classList.add('done');
       }
       this.cursor += expected.length;
+      if (this.cursor >= this.text.length || this.text[this.cursor] === ' ') {
+        if (this.app.score) this.app.score.word();
+      }
       const next = this.spans[this.spanIndex()];
       if (next) next.classList.add('current');
       this.app.audio.play('pop');

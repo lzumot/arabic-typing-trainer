@@ -46,13 +46,16 @@ export class TwinsMode {
         counts[pair] = (counts[pair] || 0) + 1;
       }
     });
-    const scored = TWIN_WORDS.map((entry) => {
-      const ch = entry.word[entry.index];
-      const weight = 1 + confusablesOf(ch).reduce((sum, other) => (
-        sum + (counts[ch + other] || 0) + (counts[other + ch] || 0)
-      ), 0);
-      return { entry, weight };
-    });
+    const scored = TWIN_WORDS
+      .map((entry) => ({ word: entry.word, index: entry.word.indexOf(entry.at) }))
+      .filter((entry) => entry.index >= 0)
+      .map((entry) => {
+        const ch = entry.word[entry.index];
+        const weight = 1 + confusablesOf(ch).reduce((sum, other) => (
+          sum + (counts[ch + other] || 0) + (counts[other + ch] || 0)
+        ), 0);
+        return { entry, weight };
+      });
     const picked = [];
     const pool = scored.slice();
     while (picked.length < WORDS_PER_ROUND && pool.length) {

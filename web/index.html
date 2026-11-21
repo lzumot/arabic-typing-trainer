@@ -13,12 +13,20 @@
 
     <div id="hud" class="hud">
       <span id="clock" class="clock" hidden>00:00</span>
+      <button id="help-btn" class="help-btn" data-label="How to play" aria-label="How to play">?</button>
     </div>
 
     <div id="tray" class="tray" hidden></div>
 
     <div id="status" class="status" hidden></div>
     <div id="toast" class="toast"></div>
+
+    <div id="score" class="scoreboard" hidden>
+      <div class="score-label">Today</div>
+      <div class="score-points" id="score-points">0</div>
+      <div class="score-sub" id="score-sub"></div>
+      <div class="score-round" id="score-round" hidden></div>
+    </div>
 
     <div id="latin-hint" class="latin-hint" hidden>
       <div class="keycaps">

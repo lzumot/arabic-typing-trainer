@@ -25,17 +25,29 @@ export class WriterMode {
     if (ev.key.length !== 1) return;
     if (ev.metaKey || ev.ctrlKey) return;
     this.typed += 1;
+    // Only Arabic letters and spaces score here. A latin key means the keyboard
+    // is on the wrong layout, so it is logged as a mistake, not as writing.
+    const ok = ev.key === ' ' || /^[\u0600-\u06FF]$/.test(ev.key);
     this.tracker.log({
       expected: ev.key,
       key: ev.key,
       code: ev.code,
       shift: ev.shiftKey,
-      correct: true,
+      correct: ok,
       appeared: null,
     });
+    if (ev.key === ' ') this.countWord();
     const seconds = Math.max(1, (performance.now() - this.startedAt) / 1000);
     const cpm = this.typed / (seconds / 60);
     this.countEl.textContent = this.typed + ' · ' + (cpm / 5).toFixed(1) + ' wpm';
+  }
+
+  countWord() {
+    const words = this.area.value.trim().split(/\s+/);
+    const last = words[words.length - 1] || '';
+    if (last.length >= 2 && /^[\u0600-\u06FF]+$/.test(last) && this.app.score) {
+      this.app.score.word();
+    }
   }
 
   exit() {

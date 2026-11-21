@@ -5,3 +5,6 @@ data/
 *.db-shm
 *.log
 .DS_Store
+
+# local backups
+web.bak-*/

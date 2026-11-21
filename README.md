@@ -9,7 +9,32 @@ Double-click `Start Trainer.command`. The browser opens on `http://127.0.0.1:876
 
 Double-click `Stop Trainer.command` to stop the server.
 
-The first keypress is already play. Letters fall; type the one on screen.
+The first keypress is already play. Blocks fall; type the letter or the short word on screen.
+Each game shows its own instruction card the first time you open it, and the `?` in the
+top-left corner brings it back.
+
+## The games
+
+| Game | What you do | Length |
+| --- | --- | --- |
+| Pop | Type the falling block. The ramp is one letter, then 2-letter, 3-letter, 4-letter words, then mixed | 30 s |
+| Twins | Fill the gap with the right look-alike letter (ة/ه, أ/إ, ذ/ز/ظ …) | 10 words |
+| Ghost race | Type a passage against the ghost of your own best run | 60 s cap |
+| Duel | You type first, the tutor types second; faster clean run wins | one text |
+| Boss text | Type a homework answer in 5–8 word chunks | one text |
+| Writer | Free writing, timed, nothing can be wrong | until Esc |
+
+All built-in content is written at MYP year 3 / language acquisition phase 3–4 level:
+connected paragraphs of 45–60 words with past, present and future, connectors (لكن، لذلك،
+لأن، بينما) and opinion phrases (في رأيي …).
+
+## Daily score
+
+The number top-right is today's score, not a session score: 1 point per correct key,
+5 per fully correct word. A wrong key scores 0 and ends the streak — nothing ever
+subtracts. It sits in the `meta` table under `score:YYYY-MM-DD` and resets at midnight.
+Pop's rung is stored under `pop:stage` (0 letters, 1 two-letter words, 2 three-letter,
+3 four-letter, 4 mixed).
 
 | Key | Does |
 | --- | --- |
@@ -49,7 +74,7 @@ web/js/metrics.js          reaction times, hunts, WPM, error classes, weekly med
 web/js/tutor.js            tutor dashboard
 web/js/records.js          "My records" (personal bests only, nothing can go down)
 web/js/modes/*.js          pop, twins, ghost, boss, duel, writer, shared text runner
-web/js/textbank.js         passages, twins word bank, letter pool
+web/js/textbank.js         passages, twins word bank, pop words, letter pool
 data/trainer.db            all history
 ```
 

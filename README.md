@@ -5,9 +5,19 @@ a Python stdlib server in between. No network, no accounts, no analytics.
 
 ## Open it
 
-Double-click `Start Trainer.command`. The browser opens on `http://127.0.0.1:8765/`.
-
+**macOS** — double-click `Start Trainer.command`. The browser opens on `http://127.0.0.1:8765/`.
 Double-click `Stop Trainer.command` to stop the server.
+
+**Windows** — double-click `Start Trainer.bat`. It finds Python (`py -3` or `python`), starts
+the server in the background and opens the browser. `Stop Trainer.bat` kills it. Python 3 must
+be installed from python.org with **Add python.exe to PATH** ticked. Nothing else is needed:
+`server.py` is stdlib only.
+
+**Windows keyboard** — set the input language to **Arabic (101)**. Its letter positions match
+the macOS “Arabic – PC” layout that `web/js/keymap.js` encodes, so the trainer sees the right
+characters.
+
+**Anywhere** — `python trainer.py` starts the server if it is not running and opens the app.
 
 The first keypress is already play. Blocks fall; type the letter or the short word on screen.
 Each game shows its own instruction card the first time you open it, and the `?` in the

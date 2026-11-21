@@ -200,6 +200,21 @@ def export_csv(table):
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # On Windows Python takes .js MIME types from the registry, where some
+    # machines map .js to text/plain. The browser then refuses every ES module
+    # and the page stays blank, so the types the app needs are pinned here.
+    extensions_map = {
+        **SimpleHTTPRequestHandler.extensions_map,
+        '.html': 'text/html; charset=utf-8',
+        '.js': 'text/javascript; charset=utf-8',
+        '.mjs': 'text/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff2': 'font/woff2',
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WEB, **kwargs)
 
